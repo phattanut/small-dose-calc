@@ -200,53 +200,44 @@
         document.getElementById('loading').style.display = 'block';
       }
 
-      // 3. Parser: แปลง Flex Message เป็น HTML (เหมือนเดิม แต่รองรับ API Response)
+      // 3. Parser: แปลง Flex Message เป็น HTML (รองรับ Footer Text แบบหลากสี)
       function renderFlexMessage(response) {
         document.getElementById('loading').style.display = 'none';
         const resultArea = document.getElementById('resultArea');
         const contentDiv = document.getElementById('resultContent');
         contentDiv.innerHTML = ''; 
 
-        // ตรวจสอบโครงสร้างข้อมูลที่ได้รับ
-        if (typeof response === 'string') {
-             contentDiv.innerHTML = `<div class="alert alert-danger">${response}</div>`;
-             resultArea.style.display = 'block';
-             return;
-        }
-        
-        // กรณี GAS ส่งกลับมาเป็น array (เช่น replyToLine เดิมส่งเป็น array)
+        // ตรวจสอบโครงสร้างข้อมูล
         let flexContent = response;
-        if (Array.isArray(response) && response.length > 0) {
-            flexContent = response[0];
-        }
-
-        if (!flexContent.contents) {
-             contentDiv.innerHTML = `<div class="alert alert-danger">รูปแบบข้อมูลไม่ถูกต้อง</div>`;
+        if (Array.isArray(response) && response.length > 0) flexContent = response[0];
+        
+        if (typeof flexContent === 'string') {
+             contentDiv.innerHTML = `<div class="alert alert-danger">${flexContent}</div>`;
              resultArea.style.display = 'block';
              return;
         }
+        if (!flexContent.contents) { return; }
 
         try {
-            const contents = flexContent.contents; // Bubble Container
+            const contents = flexContent.contents; 
             
             // --- Header ---
             const header = contents.header;
-            if (header && header.backgroundColor === '#ffcc00') { // Warning Style
+            if (header && header.backgroundColor === '#1DB446') {
                const title = header.contents[0].text;
                const subtitle = header.contents[1].text;
                contentDiv.innerHTML += `
-                 <div class="alert alert-warning text-center">
-                   <h5 class="fw-bold text-dark">${title}</h5>
-                   <p class="mb-0 text-dark small">${subtitle}</p>
+                 <div style="background:#1DB446; color:white; padding:15px; border-radius:10px 10px 0 0; margin:-20px -20px 20px -20px; text-align:center;">
+                   <h4 style="margin:0; font-weight:bold;">${title}</h4>
+                   <div style="font-size:0.9rem; opacity:0.9;">${subtitle}</div>
                  </div>
                `;
-            } else if (header && header.backgroundColor === '#1DB446') { // Success/Normal Style
-               // อาจจะใส่ Header สีเขียวถ้าต้องการ
             }
 
             // --- Body ---
             const bodyContents = contents.body.contents;
             bodyContents.forEach(item => {
+                // ... (Logic การแสดงผล Body เหมือนเดิม) ...
                 if (item.type === 'text' && item.color === '#888888') {
                     contentDiv.innerHTML += `<div class="section-title">${item.text}</div>`;
                 } else if (item.type === 'separator') {
@@ -273,21 +264,40 @@
                 }
             });
 
-            // --- Footer (Buttons) ---
+            // --- Footer (Buttons & Text) --- 🔥 จุดที่แก้ไขให้ฉลาดขึ้น
             const footer = contents.footer;
             if (footer) {
-               let btnHtml = `<div class="mt-3">`;
-               footer.contents.forEach(btn => {
-                  const dataStr = btn.action.data;
-                  let mode = 'check';
-                  if (dataStr.includes('mode=force_dilute')) mode = 'force_dilute';
-                  else if (dataStr.includes('mode=force_direct')) mode = 'force_direct';
-                  
-                  const btnClass = btn.style === 'primary' ? 'flex-btn-primary' : 'flex-btn-secondary';
-                  btnHtml += `<button class="flex-btn ${btnClass}" onclick="reCalculate('${mode}')">${btn.action.label}</button>`;
+               let footerHtml = `<div class="mt-3">`;
+               
+               footer.contents.forEach(item => {
+                  // 1. ถ้าเป็นปุ่ม
+                  if (item.type === 'button') {
+                      const action = item.action;
+                      let mode = 'check';
+                      if (action.data) {
+                          if (action.data.includes('mode=force_dilute')) mode = 'force_dilute';
+                          else if (action.data.includes('mode=force_direct')) mode = 'force_direct';
+                      }
+                      const btnClass = item.style === 'primary' ? 'flex-btn-primary' : 'flex-btn-secondary';
+                      footerHtml += `<button class="flex-btn ${btnClass}" onclick="reCalculate('${mode}')">${action.label}</button>`;
+                  }
+                  // 2. ถ้าเป็นข้อความ (Disclaimer & Ref)
+                  else if (item.type === 'text') {
+                      // 🔥 ดึงสีจากที่ส่งมา (ถ้าไม่มีให้ใช้เทา)
+                      const textColor = item.color || '#aaaaaa'; 
+                      // 🔥 ปรับขนาด (ถ้าส่ง xxs มาให้เล็กหน่อย)
+                      const fontSize = item.size === 'xxs' ? '0.7rem' : '0.8rem';
+                      
+                      footerHtml += `<div style="font-size:${fontSize}; color:${textColor}; text-align:center; margin-top:8px; line-height:1.4;">${item.text}</div>`;
+                  }
+                  // 3. เส้นคั่น
+                  else if (item.type === 'separator') {
+                      footerHtml += `<hr style="margin:15px 0; border-top:1px solid #eee;">`;
+                  }
                });
-               btnHtml += `</div>`;
-               contentDiv.innerHTML += btnHtml;
+               
+               footerHtml += `</div>`;
+               contentDiv.innerHTML += footerHtml;
             }
 
             resultArea.style.display = 'block';
@@ -300,4 +310,5 @@
       }
     </script>
 </body>
+
 </html>
