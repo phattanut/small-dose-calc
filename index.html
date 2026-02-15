@@ -197,9 +197,17 @@
         contentDiv.innerHTML = '';
         
         const flex = Array.isArray(response) ? response[0] : response;
+        
+        // กันเหนียว: กรณี Error หรือไม่มี content
+        if (!flex || !flex.contents) {
+             contentDiv.innerHTML = `<div class="alert alert-danger">ไม่พบข้อมูลผลลัพธ์</div>`;
+             document.getElementById('resultArea').style.display = 'block';
+             return;
+        }
+
         const contents = flex.contents;
 
-        // Render Header
+        // --- Render Header ---
         if(contents.header) {
             contentDiv.innerHTML += `<div style="background:#1DB446; color:white; padding:15px; border-radius:10px; margin-bottom:15px; text-align:center;">
                 <h4 class="m-0">${contents.header.contents[0].text}</h4>
@@ -207,20 +215,61 @@
             </div>`;
         }
 
-        // Render Body (Simplified Logic)
-        contents.body.contents.forEach(item => {
-            if (item.type === 'text' && item.color === '#888888') {
-                contentDiv.innerHTML += `<div class="section-title">${item.text}</div>`;
-            } else if (item.type === 'box' && item.contents && item.contents[0].size === 'xxl') {
-                contentDiv.innerHTML += `<div class="big-result">${item.contents[0].text}</div><div class="sub-result">${item.contents[1].text}</div>`;
-            } else if (item.type === 'box' && item.layout === 'baseline') {
-                contentDiv.innerHTML += `<div class="data-row"><span>${item.contents[0].text}</span><span style="color:${item.contents[1].color}">${item.contents[1].text}</span></div>`;
-            } else if (item.type === 'separator') {
-                contentDiv.innerHTML += `<hr style="border-top: 1px dashed #ccc;">`;
-            }
-        });
+        // --- Render Body ---
+        if(contents.body && contents.body.contents) {
+            contents.body.contents.forEach(item => {
+                if (item.type === 'text' && item.color === '#888888') {
+                    contentDiv.innerHTML += `<div class="section-title">${item.text}</div>`;
+                } else if (item.type === 'box' && item.contents && item.contents[0].size === 'xxl') {
+                    contentDiv.innerHTML += `<div class="big-result">${item.contents[0].text}</div><div class="sub-result">${item.contents[1].text}</div>`;
+                } else if (item.type === 'box' && item.layout === 'baseline') {
+                    contentDiv.innerHTML += `<div class="data-row"><span>${item.contents[0].text}</span><span style="color:${item.contents[1].color}">${item.contents[1].text}</span></div>`;
+                } else if (item.type === 'box' && item.backgroundColor === '#fff5e6') { // Note Box
+                    contentDiv.innerHTML += `<div class="note-box">${item.contents[0].text}</div>`;
+                } else if (item.type === 'separator') {
+                    contentDiv.innerHTML += `<hr style="border-top: 1px dashed #ccc;">`;
+                } else if (item.type === 'text' && item.color === '#FF3333') { // Warning Text
+                     contentDiv.innerHTML += `<div style="color:#FF3333; font-weight:bold; text-align:center;">${item.text}</div>`;
+                } else if (item.type === 'text') { // General Text
+                     contentDiv.innerHTML += `<div style="text-align:center; margin-top:5px;">${item.text}</div>`;
+                }
+            });
+        }
 
-        // 🔥 เพิ่มปุ่ม HYBRID (ปุ่มส่งเข้าไลน์)
+        // --- 🔥 Render Footer (ส่วนที่เพิ่มมา: ปุ่มเลือกทางเลือก & Ref) ---
+        if (contents.footer && contents.footer.contents) {
+            let footerHtml = `<div class="mt-3">`;
+            contents.footer.contents.forEach(item => {
+                // 1. ปุ่มกด (สำหรับเคส Warning หรือเลือกวิธี)
+                if (item.type === 'button') {
+                    const action = item.action;
+                    let mode = 'check'; // Default
+                    // แกะ data เพื่อดูว่าเป็นโหมดไหน
+                    if (action.data) {
+                        if (action.data.includes('mode=force_dilute')) mode = 'force_dilute';
+                        else if (action.data.includes('mode=force_direct')) mode = 'force_direct';
+                    }
+                    
+                    const btnClass = item.style === 'primary' ? 'flex-btn-primary' : 'flex-btn-secondary';
+                    // สร้างปุ่มที่กดแล้วเรียกคำนวณใหม่ (re-fetch)
+                    footerHtml += `<button class="flex-btn ${btnClass}" onclick="reCalculate('${mode}')">${action.label}</button>`;
+                } 
+                // 2. ข้อความ (Disclaimer / Ref)
+                else if (item.type === 'text') {
+                    const textColor = item.color || '#aaaaaa'; 
+                    const fontSize = item.size === 'xxs' ? '0.7rem' : '0.8rem';
+                    footerHtml += `<div style="font-size:${fontSize}; color:${textColor}; text-align:center; margin-top:8px; line-height:1.4;">${item.text}</div>`;
+                } 
+                // 3. เส้นคั่น
+                else if (item.type === 'separator') {
+                    footerHtml += `<hr style="margin:15px 0; border-top:1px solid #eee;">`;
+                }
+            });
+            footerHtml += `</div>`;
+            contentDiv.innerHTML += footerHtml;
+        }
+
+        // --- ปุ่ม HYBRID (ส่งเข้าไลน์) ---
         if (liff.isInClient()) {
             contentDiv.innerHTML += `
                 <button class="btn-line-send" onclick="sendToLine()">
@@ -230,8 +279,36 @@
         }
         document.getElementById('resultArea').style.display = 'block';
       }
+
+      // 🔥 เพิ่มฟังก์ชัน reCalculate สำหรับปุ่มใน Footer ให้ทำงานได้
+      function reCalculate(mode) {
+         const drug = document.getElementById('drugSelect').value;
+         const dose = document.getElementById('doseInput').value;
+         
+         document.getElementById('resultArea').style.display = 'none';
+         document.getElementById('loading').style.display = 'block';
+
+         fetch(WEB_APP_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                events: [{
+                    type: 'postback',
+                    postback: { data: `action=calc&drug=${encodeURIComponent(drug)}&dose=${dose}&mode=${mode}` },
+                    source: { userId: 'web_guest' },
+                    replyToken: 'dummy'
+                }]
+            }),
+            headers: { "Content-Type": "text/plain;charset=utf-8" }
+        })
+        .then(res => res.json())
+        .then(response => {
+            lastFlexResponse = response;
+            renderFlexToHtml(response);
+        });
+      }
     </script>
 </body>
 </html>
+
 
 
