@@ -94,10 +94,10 @@
 
     <script>
       // ==========================================
-      // ⚠️ CONFIGURATION - แก้ไข 2 บรรทัดนี้ครับ
+      // ⚠️ CONFIGURATION
       // ==========================================
-      const LIFF_ID = "2009008059-pFqIjvxl"; 
-      const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzqTPpgKuhL7_ZvohluwJOtguBRcwjQ8NoDbYR3iT2qaLv8huvhAp9VJ5m4LU2uEaiQnQ/exec"; 
+      const LIFF_ID = "2009008059-pFqIjvxl"; // ใส่ ID ของท่าน
+      const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzqTPpgKuhL7_ZvohluwJOtguBRcwjQ8NoDbYR3iT2qaLv8huvhAp9VJ5m4LU2uEaiQnQ/exec"; // ใส่ URL Script ของท่าน
       // ==========================================
 
       let allDrugs = [];
@@ -105,10 +105,14 @@
 
       // 1. Initial Load
       window.onload = function() {
-        liff.init({ liffId: LIFF_ID }).then(() => {
-            if (!liff.isLoggedIn()) liff.login();
-        });
+        // Init LIFF
+        if (typeof liff !== 'undefined') {
+             liff.init({ liffId: LIFF_ID }).then(() => {
+                 if (!liff.isLoggedIn()) liff.login();
+             }).catch(err => console.error(err));
+        }
 
+        // Fetch Drug List
         fetch(WEB_APP_URL + "?action=getDrugs")
           .then(res => res.json())
           .then(drugs => {
@@ -121,6 +125,7 @@
             });
           });
 
+        // Bind Search Event
         document.getElementById('smartInput').addEventListener('input', e => handleSearch(e.target.value));
       };
 
@@ -147,13 +152,18 @@
         } else { list.style.display = 'none'; }
       }
 
-      // 3. Calculation Logic
+      // 3. Calculation Logic (Main Form)
       document.getElementById('calcForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const drug = document.getElementById('drugSelect').value;
         const dose = document.getElementById('doseInput').value;
         if(!drug) { alert("กรุณาเลือกยาจากรายการค้นหาค่ะ"); return; }
         
+        callApi(drug, dose, 'check');
+      });
+
+      // ฟังก์ชันกลางสำหรับเรียก API (ใช้ซ้ำได้)
+      function callApi(drug, dose, mode) {
         document.getElementById('resultArea').style.display = 'none';
         document.getElementById('loading').style.display = 'block';
 
@@ -162,7 +172,7 @@
             body: JSON.stringify({
                 events: [{
                     type: 'postback',
-                    postback: { data: `action=calc&drug=${encodeURIComponent(drug)}&dose=${dose}&mode=check` },
+                    postback: { data: `action=calc&drug=${encodeURIComponent(drug)}&dose=${dose}&mode=${mode}` },
                     source: { userId: 'web_guest' },
                     replyToken: 'dummy'
                 }]
@@ -173,8 +183,20 @@
         .then(response => {
             lastFlexResponse = response;
             renderFlexToHtml(response);
+        })
+        .catch(err => {
+            alert("Error: " + err);
+            document.getElementById('loading').style.display = 'none';
         });
-      });
+      }
+
+      // 🔥 ฟังก์ชันนี้แหละครับที่ปุ่มกดหาไม่เจอ! (เพิ่มให้แล้ว)
+      function reCalculate(mode) {
+         const drug = document.getElementById('drugSelect').value;
+         const dose = document.getElementById('doseInput').value;
+         if(!drug || !dose) return;
+         callApi(drug, dose, mode);
+      }
 
       // 4. Send Message (Hybrid Action)
       async function sendToLine() {
@@ -183,111 +205,94 @@
             const flexObj = Array.isArray(lastFlexResponse) ? lastFlexResponse[0] : lastFlexResponse;
             await liff.sendMessages([{
                 type: "flex",
-                altText: "ผลการคำนวณยาจากระบบ Search",
+                altText: flexObj.altText || "ผลการคำนวณยา",
                 contents: flexObj.contents
             }]);
             liff.closeWindow();
-        } catch (e) { alert("Error: " + e.message); }
+        } catch (e) { alert("Error sending msg: " + e.message); }
       }
 
-      // 5. Render Parser (แปลง Flex เป็น HTML โชว์ในเว็บ)
+      // 5. Render Parser (เวอร์ชันสมบูรณ์: แก้ Stability + แก้ปุ่มกด)
       function renderFlexToHtml(response) {
         document.getElementById('loading').style.display = 'none';
         const contentDiv = document.getElementById('resultContent');
         contentDiv.innerHTML = '';
         
         const flex = Array.isArray(response) ? response[0] : response;
-        
-        if (!flex || !flex.contents) {
-             contentDiv.innerHTML = `<div class="alert alert-danger">ไม่พบข้อมูลผลลัพธ์</div>`;
-             document.getElementById('resultArea').style.display = 'block';
-             return;
-        }
+        if (!flex || !flex.contents) return;
 
         const contents = flex.contents;
 
-        // --- Render Header ---
+        // --- Header ---
         if(contents.header) {
-            contentDiv.innerHTML += `<div style="background:#1DB446; color:white; padding:15px; border-radius:10px; margin-bottom:15px; text-align:center;">
+            contentDiv.innerHTML += `
+            <div style="background:#1DB446; color:white; padding:15px; border-radius:10px; margin-bottom:15px; text-align:center;">
                 <h4 class="m-0">${contents.header.contents[0].text}</h4>
                 <small>${contents.header.contents[1].text}</small>
             </div>`;
         }
 
-        // --- Render Body ---
+        // --- Body ---
         if(contents.body && contents.body.contents) {
             contents.body.contents.forEach(item => {
-                // 1. หัวข้อ Section (สีเทาเข้ม)
                 if (item.type === 'text' && item.color === '#888888') {
                     contentDiv.innerHTML += `<div class="section-title">${item.text}</div>`;
-                } 
-                // 2. ผลลัพธ์ตัวใหญ่ (Big Result)
-                else if (item.type === 'box' && item.contents && item.contents[0].size === 'xxl') {
+                } else if (item.type === 'box' && item.contents && item.contents[0].size === 'xxl') {
                     contentDiv.innerHTML += `<div class="big-result">${item.contents[0].text}</div><div class="sub-result">${item.contents[1].text}</div>`;
-                } 
-                // 3. แถวข้อมูลปกติ (Label: Value)
-                else if (item.type === 'box' && item.layout === 'baseline') {
+                } else if (item.type === 'box' && item.layout === 'baseline') {
                     contentDiv.innerHTML += `<div class="data-row"><span>${item.contents[0].text}</span><span style="color:${item.contents[1].color}">${item.contents[1].text}</span></div>`;
-                } 
-                // 4. กล่อง Note (สีส้มอ่อน)
-                else if (item.type === 'box' && item.backgroundColor === '#fff5e6') { 
-                    contentDiv.innerHTML += `<div class="note-box">${item.contents[0].text}</div>`;
-                } 
-                // 5. 🔥 [เพิ่มใหม่] กล่อง Stability (สีเทาอ่อน)
-                else if (item.type === 'box' && item.backgroundColor === '#f8f9fa') {
-                    let html = `<div class="stability-box">`;
-                    item.contents.forEach(sub => {
-                        if(sub.type === 'text') {
-                            // หัวข้อย่อย (เช่น "หลังละลาย:")
-                            html += `<div style="font-size:0.8rem; font-weight:bold; color:#555; margin-top:5px;">${sub.text}</div>`;
-                        } else if (sub.type === 'box' && sub.layout === 'horizontal') {
-                            // แถวอุณหภูมิ (ห้อง/ตู้เย็น)
-                             html += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#666;">
-                                <span style="flex:1;">${sub.contents[0].text}</span>
-                                <span style="flex:1;">${sub.contents[1].text}</span>
-                             </div>`;
-                        } else if (sub.type === 'separator') {
-                             html += `<hr style="margin:5px 0; border-top:1px solid #ddd;">`;
-                        }
-                    });
-                    html += `</div>`;
-                    contentDiv.innerHTML += html;
-                }
-                // 6. เส้นคั่น
-                else if (item.type === 'separator') {
+                } else if (item.type === 'separator') {
                     contentDiv.innerHTML += `<hr style="border-top: 1px dashed #ccc;">`;
-                } 
-                // 7. ข้อความเตือน (สีแดง)
-                else if (item.type === 'text' && item.color === '#FF3333') { 
+                } else if (item.type === 'text' && item.color === '#FF3333') { 
                      contentDiv.innerHTML += `<div style="color:#FF3333; font-weight:bold; text-align:center;">${item.text}</div>`;
-                } 
-                // 8. ข้อความทั่วไป
-                else if (item.type === 'text') { 
+                } else if (item.type === 'text') { 
                      contentDiv.innerHTML += `<div style="text-align:center; margin-top:5px;">${item.text}</div>`;
+                }
+                // กล่องข้อมูลทั่วไป (รองรับ Note และ Stability)
+                else if (item.type === 'box' && item.layout === 'vertical') {
+                    let bgColor = item.backgroundColor || '#ffffff';
+                    let boxHtml = `<div style="background-color:${bgColor}; border-radius:8px; padding:10px; margin-top:10px;">`;
+                    if(item.contents) {
+                        item.contents.forEach(sub => {
+                            if (sub.type === 'text') {
+                                let weight = sub.weight === 'bold' ? 'bold' : 'normal';
+                                let color = sub.color || '#333';
+                                boxHtml += `<div style="font-size:0.85rem; font-weight:${weight}; color:${color}; margin-bottom:3px;">${sub.text}</div>`;
+                            } else if (sub.type === 'box' && sub.layout === 'horizontal') {
+                                boxHtml += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#666; margin-bottom:3px;">`;
+                                sub.contents.forEach(col => { boxHtml += `<span style="flex:1;">${col.text || ''}</span>`; });
+                                boxHtml += `</div>`;
+                            } else if (sub.type === 'separator') {
+                                boxHtml += `<hr style="margin:5px 0; border-top:1px solid #ddd;">`;
+                            }
+                        });
+                    }
+                    boxHtml += `</div>`;
+                    contentDiv.innerHTML += boxHtml;
                 }
             });
         }
 
-        // --- Render Footer ---
+        // --- Footer (ปุ่มกด & Ref) ---
         if (contents.footer && contents.footer.contents) {
             let footerHtml = `<div class="mt-3">`;
             contents.footer.contents.forEach(item => {
                 if (item.type === 'button') {
                     const action = item.action;
                     let mode = 'check'; 
+                    // แกะ Data เพื่อหา Mode
                     if (action.data) {
                         if (action.data.includes('mode=force_dilute')) mode = 'force_dilute';
                         else if (action.data.includes('mode=force_direct')) mode = 'force_direct';
                     }
                     const btnClass = item.style === 'primary' ? 'flex-btn-primary' : 'flex-btn-secondary';
+                    // สร้าง HTML ปุ่ม และผูก onclick กับ reCalculate
                     footerHtml += `<button class="flex-btn ${btnClass}" onclick="reCalculate('${mode}')">${action.label}</button>`;
-                } 
-                else if (item.type === 'text') {
+                } else if (item.type === 'text') {
                     const textColor = item.color || '#aaaaaa'; 
                     const fontSize = item.size === 'xxs' ? '0.7rem' : '0.8rem';
                     footerHtml += `<div style="font-size:${fontSize}; color:${textColor}; text-align:center; margin-top:8px; line-height:1.4;">${item.text}</div>`;
-                } 
-                else if (item.type === 'separator') {
+                } else if (item.type === 'separator') {
                     footerHtml += `<hr style="margin:15px 0; border-top:1px solid #eee;">`;
                 }
             });
@@ -295,8 +300,8 @@
             contentDiv.innerHTML += footerHtml;
         }
 
-        // --- ปุ่ม HYBRID (ส่งเข้าไลน์) ---
-        if (liff.isInClient()) {
+        // --- ปุ่ม HYBRID ---
+        if (typeof liff !== 'undefined' && liff.isInClient()) {
             contentDiv.innerHTML += `
                 <button class="btn-line-send" onclick="sendToLine()">
                     <i class="fab fa-line fa-lg"></i> ส่งผลคำนวณเข้าแชทและปิดหน้าต่าง
@@ -304,12 +309,12 @@
             `;
         }
         document.getElementById('resultArea').style.display = 'block';
-        // เลื่อนหน้าจอลงมาที่ผลลัพธ์
-        document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' });
+        setTimeout(() => document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' }), 100);
       }
     </script>
 </body>
 </html>
+
 
 
 
