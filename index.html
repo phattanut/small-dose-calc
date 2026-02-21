@@ -97,7 +97,7 @@
       // ⚠️ CONFIGURATION
       // ==========================================
       const LIFF_ID = "2009008059-pFqIjvxl"; // ใส่ ID ของท่าน
-      const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzqTPpgKuhL7_ZvohluwJOtguBRcwjQ8NoDbYR3iT2qaLv8huvhAp9VJ5m4LU2uEaiQnQ/exec"; // ใส่ URL Script ของท่าน
+      const proxyUrl = "/api/proxy";
       // ==========================================
 
       let allDrugs = [];
@@ -113,7 +113,7 @@
         }
 
         // Fetch Drug List
-        fetch(WEB_APP_URL + "?action=getDrugs")
+        fetch(proxyUrl + "?action=getDrugs")
           .then(res => res.json())
           .then(drugs => {
             allDrugs = drugs;
@@ -167,7 +167,7 @@
         document.getElementById('resultArea').style.display = 'none';
         document.getElementById('loading').style.display = 'block';
 
-        fetch(WEB_APP_URL, {
+        fetch(proxyUrl, {
             method: 'POST',
             body: JSON.stringify({
                 events: [{
@@ -314,6 +314,7 @@
     </script>
 </body>
 </html>
+
 
 
 
