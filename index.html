@@ -1,322 +1,164 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Small Dose Calculator (Hybrid Search)</title>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    
-    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Small Dose Calculator - รพ.น่าน</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-      body { background-color: #f0f2f5; padding: 10px; font-family: 'Sarabun', sans-serif; }
-      .main-card { border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: none; overflow: hidden; }
-      .card-header-custom { background-color: #1DB446; color: white; padding: 20px; text-align: center; }
-      .btn-calculate { background-color: #1DB446; color: white; width: 100%; font-weight: bold; border-radius: 10px; padding: 12px; border: none; }
-      .btn-calculate:hover { background-color: #169e3b; color: white; }
-      
-      /* Smart Search Styles */
-      #searchBox { position: relative; }
-      #suggestionList {
-        position: absolute; z-index: 1000; width: 100%;
-        max-height: 250px; overflow-y: auto;
-        background: white; border: 1px solid #ddd;
-        border-radius: 0 0 8px 8px; display: none;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      }
-      .suggestion-item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.95rem; }
-      .suggestion-item:hover { background-color: #f0fdf4; color: #1DB446; font-weight: bold; }
-
-      /* Result Area Styles */
-      #resultArea { display: none; margin-top: 20px; }
-      .result-box { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-      .section-title { font-size: 0.9rem; color: #888; font-weight: bold; margin-bottom: 10px; margin-top: 15px; }
-      .big-result { font-size: 2.5rem; font-weight: bold; text-align: center; color: #000; line-height: 1.2; }
-      .sub-result { font-size: 0.85rem; color: #999; text-align: center; margin-bottom: 15px; }
-      .note-box { background-color: #fff5e6; border-radius: 8px; padding: 10px; font-size: 0.85rem; color: #cc7a00; margin-top: 10px; white-space: pre-wrap; }
-      .stability-box { background-color: #f8f9fa; border-radius: 8px; padding: 10px; margin-top: 10px; }
-      .data-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
-      .data-label { color: #666; }
-      .data-value { font-weight: 500; color: #000; text-align: right; }
-
-      /* Buttons */
-      .flex-btn { width: 100%; margin-top: 8px; border-radius: 8px; padding: 10px; font-size: 0.9rem; font-weight: bold; border: none; }
-      .flex-btn-primary { background-color: #1DB446; color: white; }
-      .flex-btn-secondary { background-color: #FF3333; color: white; }
-      
-      /* LINE Send Button */
-      .btn-line-send {
-        background-color: #06C755; color: white; font-weight: bold; width: 100%;
-        border-radius: 10px; padding: 14px; margin-top: 20px;
-        display: flex; align-items: center; justify-content: center; gap: 10px;
-        border: none; box-shadow: 0 4px 10px rgba(6,199,85,0.3);
-      }
+        body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
+        .loader { border-top-color: #1DB446; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body>
-    <div class="container" style="max-width: 500px; padding: 0;">
-      <div class="card main-card mb-3">
-        <div class="card-header-custom">
-          <h4 class="m-0">👩‍⚕️ Smart Drug Search</h4>
-        </div>
-        <div class="card-body p-4">
-          <div class="mb-4">
-            <label class="form-label fw-bold text-success"><i class="fas fa-search"></i> ค้นหาชื่อยา</label>
-            <div id="searchBox">
-                <input type="text" id="smartInput" class="form-control form-control-lg" placeholder="พิมพ์ชื่อยา... (เช่น Ceft, Mero)" autocomplete="off">
-                <div id="suggestionList"></div>
-            </div>
-          </div>
+<body class="p-4 flex justify-center items-start min-h-screen">
 
-          <form id="calcForm">
-            <div style="display:none;"> <select id="drugSelect" required><option value=""></option></select>
-            </div>
-            <div class="mb-4">
-              <label for="doseInput" class="form-label fw-bold">ขนาดที่ต้องการ (Dose)</label>
-              <input type="number" step="any" class="form-control form-control-lg" id="doseInput" placeholder="ระบุตัวเลข (ไม่ต้องระบุหน่วย)" required>
-            </div>
-            <button type="submit" class="btn btn-calculate">คำนวณ</button>
-          </form>
-          
-          <div id="loading" class="text-center mt-3" style="display:none;">
-            <div class="spinner-border text-success" role="status"></div>
-            <p class="text-muted small mt-2">กำลังประมวลผล...</p>
-          </div>
+    <div class="w-full max-w-md bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-green-600 p-4 text-center">
+            <h1 class="text-white text-xl font-bold">💉 Small Dose Calculator</h1>
+            <p class="text-green-100 text-sm">โรงพยาบาลน่าน</p>
         </div>
-      </div>
 
-      <div id="resultArea">
-        <div class="result-box" id="resultContent"></div>
-      </div>
+        <div class="p-6">
+            <form id="calcForm" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">1. เลือกยา (Drug Name)</label>
+                    <select id="drugSelect" class="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" required>
+                        <option value="">กำลังเริ่มต้นระบบ...</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">2. ระบุขนาดยา (Dose)</label>
+                    <div class="flex">
+                        <input type="number" id="doseInput" step="any" placeholder="ระบุตัวเลข" class="w-full border border-gray-300 p-3 rounded-l-lg focus:ring-2 focus:ring-green-500 outline-none text-lg" required disabled>
+                        <div class="bg-gray-100 border border-l-0 border-gray-300 text-gray-600 p-3 rounded-r-lg font-bold w-24 flex items-center justify-center" id="unitLabel">-</div>
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn" class="w-full bg-green-500 text-white font-bold py-3 rounded-lg shadow hover:bg-green-600 transition disabled:opacity-50 flex justify-center items-center" disabled>
+                    <span id="btnText">คำนวณการผสมยา</span>
+                    <div id="btnSpinner" class="hidden loader rounded-full border-2 border-t-2 border-white h-5 w-5 ml-2"></div>
+                </button>
+            </form>
+
+            <div id="resultContainer" class="mt-6 hidden">
+                <div class="border-t pt-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-2">📊 ผลการคำนวณ:</h2>
+                    <div id="resultBox" class="bg-gray-50 p-4 rounded-lg border border-gray-200 text-sm whitespace-pre-wrap"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-      // ==========================================
-      // ⚠️ CONFIGURATION
-      // ==========================================
-      const LIFF_ID = "2009008059-pFqIjvxl"; // ใส่ ID ของท่าน
-      const proxyUrl = "/api/proxy";
-      // ==========================================
+        const API_URL = "/api/proxy"; 
+        // 🚨ใส่ LIFF ID
+        const MY_LIFF_ID = "2009008059-pFqIjvxl"; 
 
-      let allDrugs = [];
-      let lastFlexResponse = null;
+        const drugSelect = document.getElementById('drugSelect');
+        const unitLabel = document.getElementById('unitLabel');
+        const doseInput = document.getElementById('doseInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const resultContainer = document.getElementById('resultContainer');
+        const resultBox = document.getElementById('resultBox');
 
-      // 1. Initial Load
-      window.onload = function() {
-        // Init LIFF
-        if (typeof liff !== 'undefined') {
-             liff.init({ liffId: LIFF_ID }).then(() => {
-                 if (!liff.isLoggedIn()) liff.login();
-             }).catch(err => console.error(err));
+        async function initializeApp() {
+            try {
+                // 1. เริ่มต้น LIFF
+                await liff.init({ liffId: MY_LIFF_ID });
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+                // 2. เมื่อ LIFF พร้อมแล้วค่อยโหลดรายชื่อยา
+                await fetchDrugs();
+            } catch (error) {
+                console.error("LIFF Init Error", error);
+                resultBox.innerText = "❌ ไม่สามารถเชื่อมต่อกับ LINE ได้";
+                resultContainer.classList.remove('hidden');
+            }
         }
 
-        // Fetch Drug List
-        fetch(proxyUrl + "?action=getDrugs")
-          .then(res => res.json())
-          .then(drugs => {
-            allDrugs = drugs;
-            const select = document.getElementById('drugSelect');
-            drugs.forEach(d => {
-              let opt = document.createElement("option");
-              opt.value = opt.text = d;
-              select.add(opt);
-            });
-          });
+        async function fetchDrugs() {
+            try {
+                const response = await fetch(`${API_URL}?action=getDrugs`);
+                const drugs = await response.json();
+                drugSelect.innerHTML = '<option value="">-- เลือกยา --</option>';
+                drugs.forEach(drug => {
+                    let option = document.createElement('option');
+                    option.value = drug.name;
+                    option.text = drug.name;
+                    option.setAttribute('data-unit', drug.unit);
+                    drugSelect.appendChild(option);
+                });
+                doseInput.disabled = false;
+                submitBtn.disabled = false;
+            } catch (error) {
+                drugSelect.innerHTML = '<option value="">โหลดข้อมูลล้มเหลว</option>';
+            }
+        }
 
-        // Bind Search Event
-        document.getElementById('smartInput').addEventListener('input', e => handleSearch(e.target.value));
-      };
-
-      // 2. Search Logic
-      function handleSearch(keyword) {
-        const list = document.getElementById('suggestionList');
-        list.innerHTML = '';
-        if (!keyword || keyword.length < 2) { list.style.display = 'none'; return; }
-        const matches = allDrugs.filter(d => d.toLowerCase().includes(keyword.toLowerCase()));
-        if (matches.length > 0) {
-            matches.forEach(drug => {
-                const div = document.createElement('div');
-                div.className = 'suggestion-item';
-                div.innerText = drug;
-                div.onclick = () => {
-                    document.getElementById('smartInput').value = drug;
-                    document.getElementById('drugSelect').value = drug;
-                    list.style.display = 'none';
-                    document.getElementById('doseInput').focus();
-                };
-                list.appendChild(div);
-            });
-            list.style.display = 'block';
-        } else { list.style.display = 'none'; }
-      }
-
-      // 3. Calculation Logic (Main Form)
-      document.getElementById('calcForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const drug = document.getElementById('drugSelect').value;
-        const dose = document.getElementById('doseInput').value;
-        if(!drug) { alert("กรุณาเลือกยาจากรายการค้นหาค่ะ"); return; }
-        
-        callApi(drug, dose, 'check');
-      });
-
-      // ฟังก์ชันกลางสำหรับเรียก API (ใช้ซ้ำได้)
-      function callApi(drug, dose, mode) {
-        document.getElementById('resultArea').style.display = 'none';
-        document.getElementById('loading').style.display = 'block';
-
-        fetch(proxyUrl, {
-            method: 'POST',
-            body: JSON.stringify({
-                events: [{
-                    type: 'postback',
-                    postback: { data: `action=calc&drug=${encodeURIComponent(drug)}&dose=${dose}&mode=${mode}` },
-                    source: { userId: 'web_guest' },
-                    replyToken: 'dummy'
-                }]
-            }),
-            headers: { "Content-Type": "text/plain;charset=utf-8" }
-        })
-        .then(res => res.json())
-        .then(response => {
-            lastFlexResponse = response;
-            renderFlexToHtml(response);
-        })
-        .catch(err => {
-            alert("Error: " + err);
-            document.getElementById('loading').style.display = 'none';
+        drugSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (this.value) {
+                const unit = selectedOption.getAttribute('data-unit');
+                unitLabel.innerText = unit;
+                unitLabel.classList.replace('bg-gray-100', 'bg-green-100');
+                unitLabel.classList.replace('text-gray-600', 'text-green-700');
+            } else {
+                unitLabel.innerText = '-';
+                unitLabel.classList.replace('bg-green-100', 'bg-gray-100');
+                unitLabel.classList.replace('text-green-700', 'text-gray-600');
+            }
         });
-      }
 
-      // 🔥 ฟังก์ชันนี้แหละครับที่ปุ่มกดหาไม่เจอ! (เพิ่มให้แล้ว)
-      function reCalculate(mode) {
-         const drug = document.getElementById('drugSelect').value;
-         const dose = document.getElementById('doseInput').value;
-         if(!drug || !dose) return;
-         callApi(drug, dose, mode);
-      }
+        document.getElementById('calcForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // ดึง Profile ของ User เพื่อบันทึกประวัติ
+            const profile = await liff.getProfile();
+            const userId = profile.userId;
 
-      // 4. Send Message (Hybrid Action)
-      async function sendToLine() {
-        if (!lastFlexResponse || !liff.isInClient()) return;
-        try {
-            const flexObj = Array.isArray(lastFlexResponse) ? lastFlexResponse[0] : lastFlexResponse;
-            await liff.sendMessages([{
-                type: "flex",
-                altText: flexObj.altText || "ผลการคำนวณยา",
-                contents: flexObj.contents
-            }]);
-            liff.closeWindow();
-        } catch (e) { alert("Error sending msg: " + e.message); }
-      }
+            submitBtn.disabled = true;
+            document.getElementById('btnText').innerText = "กำลังคำนวณ...";
+            document.getElementById('btnSpinner').classList.remove('hidden');
 
-      // 5. Render Parser (เวอร์ชันสมบูรณ์: แก้ Stability + แก้ปุ่มกด)
-      function renderFlexToHtml(response) {
-        document.getElementById('loading').style.display = 'none';
-        const contentDiv = document.getElementById('resultContent');
-        contentDiv.innerHTML = '';
-        
-        const flex = Array.isArray(response) ? response[0] : response;
-        if (!flex || !flex.contents) return;
-
-        const contents = flex.contents;
-
-        // --- Header ---
-        if(contents.header) {
-            contentDiv.innerHTML += `
-            <div style="background:#1DB446; color:white; padding:15px; border-radius:10px; margin-bottom:15px; text-align:center;">
-                <h4 class="m-0">${contents.header.contents[0].text}</h4>
-                <small>${contents.header.contents[1].text}</small>
-            </div>`;
-        }
-
-        // --- Body ---
-        if(contents.body && contents.body.contents) {
-            contents.body.contents.forEach(item => {
-                if (item.type === 'text' && item.color === '#888888') {
-                    contentDiv.innerHTML += `<div class="section-title">${item.text}</div>`;
-                } else if (item.type === 'box' && item.contents && item.contents[0].size === 'xxl') {
-                    contentDiv.innerHTML += `<div class="big-result">${item.contents[0].text}</div><div class="sub-result">${item.contents[1].text}</div>`;
-                } else if (item.type === 'box' && item.layout === 'baseline') {
-                    contentDiv.innerHTML += `<div class="data-row"><span>${item.contents[0].text}</span><span style="color:${item.contents[1].color}">${item.contents[1].text}</span></div>`;
-                } else if (item.type === 'separator') {
-                    contentDiv.innerHTML += `<hr style="border-top: 1px dashed #ccc;">`;
-                } else if (item.type === 'text' && item.color === '#FF3333') { 
-                     contentDiv.innerHTML += `<div style="color:#FF3333; font-weight:bold; text-align:center;">${item.text}</div>`;
-                } else if (item.type === 'text') { 
-                     contentDiv.innerHTML += `<div style="text-align:center; margin-top:5px;">${item.text}</div>`;
-                }
-                // กล่องข้อมูลทั่วไป (รองรับ Note และ Stability)
-                else if (item.type === 'box' && item.layout === 'vertical') {
-                    let bgColor = item.backgroundColor || '#ffffff';
-                    let boxHtml = `<div style="background-color:${bgColor}; border-radius:8px; padding:10px; margin-top:10px;">`;
-                    if(item.contents) {
-                        item.contents.forEach(sub => {
-                            if (sub.type === 'text') {
-                                let weight = sub.weight === 'bold' ? 'bold' : 'normal';
-                                let color = sub.color || '#333';
-                                boxHtml += `<div style="font-size:0.85rem; font-weight:${weight}; color:${color}; margin-bottom:3px;">${sub.text}</div>`;
-                            } else if (sub.type === 'box' && sub.layout === 'horizontal') {
-                                boxHtml += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#666; margin-bottom:3px;">`;
-                                sub.contents.forEach(col => { boxHtml += `<span style="flex:1;">${col.text || ''}</span>`; });
-                                boxHtml += `</div>`;
-                            } else if (sub.type === 'separator') {
-                                boxHtml += `<hr style="margin:5px 0; border-top:1px solid #ddd;">`;
-                            }
-                        });
+            const payload = {
+                events: [{
+                    type: "postback",
+                    replyToken: "web_request", 
+                    source: { userId: userId }, // 🔥 ใช้ UserID จริงจาก LINE
+                    postback: {
+                        data: `action=calc&drug=${encodeURIComponent(drugSelect.value)}&dose=${doseInput.value}&unit=${unitLabel.innerText}`
                     }
-                    boxHtml += `</div>`;
-                    contentDiv.innerHTML += boxHtml;
-                }
-            });
-        }
+                }]
+            };
 
-        // --- Footer (ปุ่มกด & Ref) ---
-        if (contents.footer && contents.footer.contents) {
-            let footerHtml = `<div class="mt-3">`;
-            contents.footer.contents.forEach(item => {
-                if (item.type === 'button') {
-                    const action = item.action;
-                    let mode = 'check'; 
-                    // แกะ Data เพื่อหา Mode
-                    if (action.data) {
-                        if (action.data.includes('mode=force_dilute')) mode = 'force_dilute';
-                        else if (action.data.includes('mode=force_direct')) mode = 'force_direct';
-                    }
-                    const btnClass = item.style === 'primary' ? 'flex-btn-primary' : 'flex-btn-secondary';
-                    // สร้าง HTML ปุ่ม และผูก onclick กับ reCalculate
-                    footerHtml += `<button class="flex-btn ${btnClass}" onclick="reCalculate('${mode}')">${action.label}</button>`;
-                } else if (item.type === 'text') {
-                    const textColor = item.color || '#aaaaaa'; 
-                    const fontSize = item.size === 'xxs' ? '0.7rem' : '0.8rem';
-                    footerHtml += `<div style="font-size:${fontSize}; color:${textColor}; text-align:center; margin-top:8px; line-height:1.4;">${item.text}</div>`;
-                } else if (item.type === 'separator') {
-                    footerHtml += `<hr style="margin:15px 0; border-top:1px solid #eee;">`;
-                }
-            });
-            footerHtml += `</div>`;
-            contentDiv.innerHTML += footerHtml;
-        }
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+                const resultData = await response.json();
+                
+                // แสดงผล (เดี๋ยวเราค่อยมาทำฟังก์ชัน render สวยๆ วันหลังครับ)
+                resultBox.innerText = "คำนวณเรียบร้อย! ข้อมูลส่งมาจากหลังบ้านครบถ้วนค่ะ";
+                resultContainer.classList.remove('hidden');
+            } catch (error) {
+                resultBox.innerText = "❌ เกิดข้อผิดพลาด: " + error.message;
+                resultContainer.classList.remove('hidden');
+            } finally {
+                document.getElementById('btnText').innerText = "คำนวณการผสมยา";
+                document.getElementById('btnSpinner').classList.add('hidden');
+                submitBtn.disabled = false;
+            }
+        });
 
-        // --- ปุ่ม HYBRID ---
-        if (typeof liff !== 'undefined' && liff.isInClient()) {
-            contentDiv.innerHTML += `
-                <button class="btn-line-send" onclick="sendToLine()">
-                    <i class="fab fa-line fa-lg"></i> ส่งผลคำนวณเข้าแชทและปิดหน้าต่าง
-                </button>
-            `;
-        }
-        document.getElementById('resultArea').style.display = 'block';
-        setTimeout(() => document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' }), 100);
-      }
+        initializeApp();
     </script>
 </body>
 </html>
-
-
-
-
-
-
