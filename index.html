@@ -24,17 +24,16 @@
         <div class="p-6">
             <form id="calcForm" class="space-y-5">
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-1">1. เลือกยา (Drug Name)</label>
-                    <select id="drugSelect" class="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" required>
-                        <option value="">กำลังเริ่มต้นระบบ...</option>
-                    </select>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">1. ค้นหายา (Search Drug)</label>
+                    <input type="text" id="drugInput" list="drugOptions" placeholder="พิมพ์ชื่อยา เช่น mero, ampi..." class="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-green-500 outline-none transition" required>
+                    <datalist id="drugOptions"></datalist>
                 </div>
 
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-1">2. ระบุขนาดยา (Dose)</label>
                     <div class="flex">
                         <input type="number" id="doseInput" step="any" placeholder="ระบุตัวเลข" class="w-full border border-gray-300 p-3 rounded-l-lg focus:ring-2 focus:ring-green-500 outline-none text-lg" required disabled>
-                        <div class="bg-gray-100 border border-l-0 border-gray-300 text-gray-600 p-3 rounded-r-lg font-bold w-24 flex items-center justify-center" id="unitLabel">-</div>
+                        <div class="bg-gray-100 border border-l-0 border-gray-300 text-gray-600 p-3 rounded-r-lg font-bold w-24 flex items-center justify-center transition-all duration-300" id="unitLabel">-</div>
                     </div>
                 </div>
 
@@ -45,9 +44,15 @@
             </form>
 
             <div id="resultContainer" class="mt-6 hidden">
-                <div class="border-t pt-4">
-                    <h2 class="text-lg font-bold text-gray-800 mb-2">📊 ผลการคำนวณ:</h2>
-                    <div id="resultBox" class="bg-gray-50 p-4 rounded-lg border border-gray-200 text-sm whitespace-pre-wrap"></div>
+                <div class="border-t pt-4 space-y-4">
+                    <h2 class="text-lg font-bold text-gray-800">📊 ผลการคำนวณเบื้องต้น:</h2>
+                    <div id="resultBox" class="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm text-blue-900 whitespace-pre-wrap font-medium">
+                        </div>
+                    
+                    <button id="sendToChatBtn" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg shadow hover:bg-blue-700 transition flex justify-center items-center">
+                        <span>📤 ส่งเข้าแชท & ปิดหน้าต่าง</span>
+                    </button>
+                    <p class="text-center text-[10px] text-gray-400">เมื่อกดส่ง หน้าต่างนี้จะปิดลงอัตโนมัติ</p>
                 </div>
             </div>
         </div>
@@ -55,84 +60,78 @@
 
     <script>
         const API_URL = "/api/proxy"; 
-        // 🚨ใส่ LIFF ID
-        const MY_LIFF_ID = "2009008059-pFqIjvxl"; 
+        const MY_LIFF_ID = "2009008059-pFqIjvxl"; // 🚨 LIFF ID
 
-        const drugSelect = document.getElementById('drugSelect');
+        let drugDatabase = [];
+        let lastFlexMessage = null;
+
+        const drugInput = document.getElementById('drugInput');
+        const drugOptions = document.getElementById('drugOptions');
         const unitLabel = document.getElementById('unitLabel');
         const doseInput = document.getElementById('doseInput');
         const submitBtn = document.getElementById('submitBtn');
         const resultContainer = document.getElementById('resultContainer');
         const resultBox = document.getElementById('resultBox');
+        const sendToChatBtn = document.getElementById('sendToChatBtn');
 
+        // เริ่มต้นระบบ
         async function initializeApp() {
             try {
-                // 1. เริ่มต้น LIFF
                 await liff.init({ liffId: MY_LIFF_ID });
-                if (!liff.isLoggedIn()) {
-                    liff.login();
-                    return;
-                }
-                // 2. เมื่อ LIFF พร้อมแล้วค่อยโหลดรายชื่อยา
+                if (!liff.isLoggedIn()) { liff.login(); return; }
                 await fetchDrugs();
             } catch (error) {
                 console.error("LIFF Init Error", error);
-                resultBox.innerText = "❌ ไม่สามารถเชื่อมต่อกับ LINE ได้";
-                resultContainer.classList.remove('hidden');
             }
         }
 
+        // โหลดข้อมูลยา
         async function fetchDrugs() {
             try {
                 const response = await fetch(`${API_URL}?action=getDrugs`);
-                const drugs = await response.json();
-                drugSelect.innerHTML = '<option value="">-- เลือกยา --</option>';
-                drugs.forEach(drug => {
+                drugDatabase = await response.json();
+                drugOptions.innerHTML = '';
+                drugDatabase.forEach(drug => {
                     let option = document.createElement('option');
                     option.value = drug.name;
-                    option.text = drug.name;
-                    option.setAttribute('data-unit', drug.unit);
-                    drugSelect.appendChild(option);
+                    drugOptions.appendChild(option);
                 });
                 doseInput.disabled = false;
                 submitBtn.disabled = false;
             } catch (error) {
-                drugSelect.innerHTML = '<option value="">โหลดข้อมูลล้มเหลว</option>';
+                console.error("Fetch Drugs Error", error);
             }
         }
 
-        drugSelect.addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            if (this.value) {
-                const unit = selectedOption.getAttribute('data-unit');
-                unitLabel.innerText = unit;
-                unitLabel.classList.replace('bg-gray-100', 'bg-green-100');
-                unitLabel.classList.replace('text-gray-600', 'text-green-700');
+        // ตรวจจับชื่อยาเพื่อล็อกหน่วย
+        drugInput.addEventListener('input', function() {
+            const match = drugDatabase.find(d => d.name === this.value);
+            if (match) {
+                unitLabel.innerText = match.unit;
+                unitLabel.className = "bg-green-100 border border-l-0 border-gray-300 text-green-700 p-3 rounded-r-lg font-bold w-24 flex items-center justify-center";
             } else {
                 unitLabel.innerText = '-';
-                unitLabel.classList.replace('bg-green-100', 'bg-gray-100');
-                unitLabel.classList.replace('text-green-700', 'text-gray-600');
+                unitLabel.className = "bg-gray-100 border border-l-0 border-gray-300 text-gray-600 p-3 rounded-r-lg font-bold w-24 flex items-center justify-center";
             }
         });
 
+        // กดปุ่มคำนวณ
         document.getElementById('calcForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            // ดึง Profile ของ User เพื่อบันทึกประวัติ
             const profile = await liff.getProfile();
-            const userId = profile.userId;
-
+            
             submitBtn.disabled = true;
             document.getElementById('btnText').innerText = "กำลังคำนวณ...";
             document.getElementById('btnSpinner').classList.remove('hidden');
+            resultContainer.classList.add('hidden');
 
             const payload = {
                 events: [{
                     type: "postback",
-                    replyToken: "web_request", 
-                    source: { userId: userId }, // 🔥 ใช้ UserID จริงจาก LINE
+                    replyToken: "web_request",
+                    source: { userId: profile.userId },
                     postback: {
-                        data: `action=calc&drug=${encodeURIComponent(drugSelect.value)}&dose=${doseInput.value}&unit=${unitLabel.innerText}`
+                        data: `action=calc&drug=${encodeURIComponent(drugInput.value)}&dose=${doseInput.value}&unit=${unitLabel.innerText}`
                     }
                 }]
             };
@@ -143,19 +142,40 @@
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify(payload)
                 });
-                const resultData = await response.json();
+                const result = await response.json();
+                lastFlexMessage = result; // เก็บ Flex Message ไว้
+
+                // แสดง Preview สั้นๆ ในหน้าจอ
+                resultBox.innerText = `✅ ตรวจสอบข้อมูล:\n💊 ${drugInput.value}\n⚖️ ขนาด: ${doseInput.value} ${unitLabel.innerText}\n\nระบบคำนวณแผนการเตรียมยาเสร็จแล้ว\nกดปุ่มด้านล่างเพื่อส่งผลเข้าแชทค่ะ`;
+                resultContainer.classList.remove('hidden');
                 
-                // แสดงผล (เดี๋ยวเราค่อยมาทำฟังก์ชัน render สวยๆ วันหลังครับ)
-                resultBox.innerText = "คำนวณเรียบร้อย! ข้อมูลส่งมาจากหลังบ้านครบถ้วนค่ะ";
-                resultContainer.classList.remove('hidden');
             } catch (error) {
-                resultBox.innerText = "❌ เกิดข้อผิดพลาด: " + error.message;
-                resultContainer.classList.remove('hidden');
+                alert("เกิดข้อผิดพลาด: " + error.message);
             } finally {
                 document.getElementById('btnText').innerText = "คำนวณการผสมยา";
                 document.getElementById('btnSpinner').classList.add('hidden');
                 submitBtn.disabled = false;
             }
+        });
+
+        // 🔥 ปุ่มส่งเข้า Chat และปิดหน้าต่างอัตโนมัติ
+        sendToChatBtn.addEventListener('click', function() {
+            if (!lastFlexMessage) return;
+
+            // เปลี่ยนสถานะปุ่มขณะส่ง
+            this.disabled = true;
+            this.innerText = "กำลังส่งข้อมูล...";
+
+            liff.sendMessages([lastFlexMessage])
+                .then(() => {
+                    // เมื่อส่งสำเร็จ สั่งปิดหน้าต่าง LIFF ทันที
+                    liff.closeWindow();
+                })
+                .catch((err) => {
+                    alert("ส่งเข้าแชทไม่สำเร็จ: " + err.message);
+                    this.disabled = false;
+                    this.innerText = "📤 ส่งเข้าแชท & ปิดหน้าต่าง";
+                });
         });
 
         initializeApp();
