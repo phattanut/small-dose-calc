@@ -64,8 +64,12 @@
         <div class="card-body p-4">
           <div class="mb-4">
             <label class="form-label fw-bold text-success"><i class="fas fa-search"></i> ค้นหาชื่อยา</label>
-            <div id="searchBox">
-                <input type="text" id="smartInput" class="form-control form-control-lg" placeholder="พิมพ์ชื่อยา... (เช่น Ceft, Mero)" autocomplete="off">
+            <div id="searchBox" style="position: relative;">
+                <input type="text" id="smartInput" class="form-control form-control-lg" 
+                       placeholder="กำลังโหลดข้อมูลยา... กรุณารอครู่เดียว" autocomplete="off" disabled>
+                <div id="searchLoader" class="spinner-border spinner-border-sm text-success" 
+                     style="position: absolute; right: 15px; top: 18px; display: block;" role="status">
+                </div>
                 <div id="suggestionList"></div>
             </div>
           </div>
@@ -117,13 +121,29 @@
         fetch(proxyUrl + "?action=getDrugs")
           .then(res => res.json())
           .then(drugs => {
-            allDrugs = drugs; // 🎯 รับค่ามาเป็น Object {name: "...", unit: "..."}
+            allDrugs = drugs; 
             const select = document.getElementById('drugSelect');
             drugs.forEach(d => {
               let opt = document.createElement("option");
-              opt.value = opt.text = d.name; // ดึงชื่อมาใส่ hidden select
+              opt.value = opt.text = d.name;
               select.add(opt);
             });
+        
+            // --- ส่วนที่เพิ่มใหม่ ---
+            const smartInput = document.getElementById('smartInput');
+            const searchLoader = document.getElementById('searchLoader');
+            
+            smartInput.disabled = false; // ปลดล็อกช่องพิมพ์
+            smartInput.placeholder = "พิมพ์ชื่อยา... (เช่น Ceft, Mero)"; // คืนค่า placeholder
+            searchLoader.style.display = 'none'; // ซ่อนตัวหมุน
+            smartInput.classList.add('is-valid'); // (เสริม) เพิ่มขอบเขียวให้รู้ว่าพร้อมแล้ว
+            setTimeout(() => smartInput.classList.remove('is-valid'), 2000); 
+            // ----------------------
+          })
+          .catch(err => {
+            console.error(err);
+            document.getElementById('smartInput').placeholder = "โหลดข้อมูลไม่สำเร็จ กรุณารีเฟรช";
+            document.getElementById('searchLoader').className = "fas fa-exclamation-circle text-danger";
           });
 
         // Bind Search Event
@@ -349,3 +369,4 @@
     </script>
 </body>
 </html>
+
